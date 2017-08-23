@@ -7,34 +7,34 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 
-#import "YGLayout+Private.h"
-#import "UIView+Yoga.h"
+#import "YGLayout.h"
+#import <yoga/Yoga.h>
 
 #define YG_PROPERTY(type, lowercased_name, capitalized_name)    \
 - (type)lowercased_name                                         \
 {                                                               \
-  return YGNodeStyleGet##capitalized_name(self.node);           \
+  return YGNodeStyleGet##capitalized_name(_node);               \
 }                                                               \
                                                                 \
 - (void)set##capitalized_name:(type)lowercased_name             \
 {                                                               \
-  YGNodeStyleSet##capitalized_name(self.node, lowercased_name); \
+  YGNodeStyleSet##capitalized_name(_node, lowercased_name);     \
 }
 
 #define YG_VALUE_PROPERTY(lowercased_name, capitalized_name)                       \
 - (YGValue)lowercased_name                                                         \
 {                                                                                  \
-  return YGNodeStyleGet##capitalized_name(self.node);                              \
+  return YGNodeStyleGet##capitalized_name(_node);                                  \
 }                                                                                  \
                                                                                    \
 - (void)set##capitalized_name:(YGValue)lowercased_name                             \
 {                                                                                  \
   switch (lowercased_name.unit) {                                                  \
     case YGUnitPoint:                                                              \
-      YGNodeStyleSet##capitalized_name(self.node, lowercased_name.value);          \
+      YGNodeStyleSet##capitalized_name(_node, lowercased_name.value);              \
       break;                                                                       \
     case YGUnitPercent:                                                            \
-      YGNodeStyleSet##capitalized_name##Percent(self.node, lowercased_name.value); \
+      YGNodeStyleSet##capitalized_name##Percent(_node, lowercased_name.value);     \
       break;                                                                       \
     default:                                                                       \
       NSAssert(NO, @"Not implemented");                                            \
@@ -44,13 +44,13 @@
 #define YG_EDGE_PROPERTY_GETTER(type, lowercased_name, capitalized_name, property, edge) \
 - (type)lowercased_name                                                                  \
 {                                                                                        \
-  return YGNodeStyleGet##property(self.node, edge);                                      \
+  return YGNodeStyleGet##property(_node, edge);                                          \
 }
 
 #define YG_EDGE_PROPERTY_SETTER(lowercased_name, capitalized_name, property, edge) \
 - (void)set##capitalized_name:(CGFloat)lowercased_name                             \
 {                                                                                  \
-  YGNodeStyleSet##property(self.node, edge, lowercased_name);                      \
+  YGNodeStyleSet##property(_node, edge, lowercased_name);                          \
 }
 
 #define YG_EDGE_PROPERTY(lowercased_name, capitalized_name, property, edge)         \
@@ -62,10 +62,10 @@ YG_EDGE_PROPERTY_SETTER(lowercased_name, capitalized_name, property, edge)
 {                                                                                                \
   switch (objc_lowercased_name.unit) {                                                           \
     case YGUnitPoint:                                                                            \
-      YGNodeStyleSet##c_name(self.node, edge, objc_lowercased_name.value);                       \
+      YGNodeStyleSet##c_name(_node, edge, objc_lowercased_name.value);                           \
       break;                                                                                     \
     case YGUnitPercent:                                                                          \
-      YGNodeStyleSet##c_name##Percent(self.node, edge, objc_lowercased_name.value);              \
+      YGNodeStyleSet##c_name##Percent(_node, edge, objc_lowercased_name.value);                  \
       break;                                                                                     \
     default:                                                                                     \
       NSAssert(NO, @"Not implemented");                                                          \
@@ -91,7 +91,6 @@ YGValue YGPointValue(CGFloat value)
 {
   return (YGValue) { .value = value, .unit = YGUnitPoint };
 }
-
 YGValue YGPercentValue(CGFloat value)
 {
   return (YGValue) { .value = value, .unit = YGUnitPercent };
@@ -99,17 +98,14 @@ YGValue YGPercentValue(CGFloat value)
 
 static YGConfigRef globalConfig;
 
-@interface YGLayout ()
-
-@property (nonatomic, weak, readonly) UIView *view;
-
-@end
-
-@implementation YGLayout
+@implementation YGLayout {
+    @public
+    YGNodeRef _node;
+    id<YGLayoutEntity> _entity;
+}
 
 @synthesize isEnabled=_isEnabled;
 @synthesize isIncludedInLayout=_isIncludedInLayout;
-@synthesize node=_node;
 
 + (void)initialize
 {
@@ -118,12 +114,17 @@ static YGConfigRef globalConfig;
   YGConfigSetPointScaleFactor(globalConfig, [UIScreen mainScreen].scale);
 }
 
-- (instancetype)initWithView:(UIView*)view
+- (instancetype)init
 {
+  return [self initWithEntity:nil];
+}
+- (instancetype)initWithEntity:(id<YGLayoutEntity>)entity
+{
+  NSParameterAssert(entity);
   if (self = [super init]) {
-    _view = view;
+    _entity = entity;
     _node = YGNodeNewWithConfig(globalConfig);
-    YGNodeSetContext(_node, (__bridge void *) view);
+    YGNodeSetContext(_node, (__bridge void *) entity);
     _isEnabled = NO;
     _isIncludedInLayout = YES;
   }
@@ -133,12 +134,12 @@ static YGConfigRef globalConfig;
 
 - (void)dealloc
 {
-  YGNodeFree(self.node);
+  YGNodeFree(_node);
 }
 
 - (BOOL)isDirty
 {
-  return YGNodeIsDirty(self.node);
+  return YGNodeIsDirty(_node);
 }
 
 - (void)markDirty
@@ -150,25 +151,23 @@ static YGConfigRef globalConfig;
   // Yoga is not happy if we try to mark a node as "dirty" before we have set
   // the measure function. Since we already know that this is a leaf,
   // this *should* be fine. Forgive me Hack Gods.
-  const YGNodeRef node = self.node;
-  if (YGNodeGetMeasureFunc(node) == NULL) {
-    YGNodeSetMeasureFunc(node, YGMeasureView);
+  if (YGNodeGetMeasureFunc(_node) == NULL) {
+    YGNodeSetMeasureFunc(_node, YGMeasureEntity);
   }
-
-  YGNodeMarkDirty(node);
+  YGNodeMarkDirty(_node);
 }
 
 - (NSUInteger)numberOfChildren
 {
-  return YGNodeGetChildCount(self.node);
+  return YGNodeGetChildCount(_node);
 }
 
 - (BOOL)isLeaf
 {
   NSAssert([NSThread isMainThread], @"This method must be called on the main thread.");
   if (self.isEnabled) {
-    for (UIView *subview in self.view.subviews) {
-      YGLayout *const yoga = subview.yoga;
+    for (id<YGLayoutEntity> subEntity in _entity.subEntities) {
+      YGLayout *const yoga = subEntity.yoga;
       if (yoga.isEnabled && yoga.isIncludedInLayout) {
         return NO;
       }
@@ -182,12 +181,12 @@ static YGConfigRef globalConfig;
 
 - (YGPositionType)position
 {
-  return YGNodeStyleGetPositionType(self.node);
+  return YGNodeStyleGetPositionType(_node);
 }
 
 - (void)setPosition:(YGPositionType)position
 {
-  YGNodeStyleSetPositionType(self.node, position);
+  YGNodeStyleSetPositionType(_node, position);
 }
 
 YG_PROPERTY(YGDirection, direction, Direction)
@@ -233,24 +232,24 @@ YG_PROPERTY(CGFloat, aspectRatio, AspectRatio)
 
 - (YGDirection)resolvedDirection
 {
-  return YGNodeLayoutGetDirection(self.node);
+  return YGNodeLayoutGetDirection(_node);
 }
 
 - (void)applyLayout
 {
-  [self calculateLayoutWithSize:self.view.bounds.size];
-  YGApplyLayoutToViewHierarchy(self.view, NO);
+  [self calculateLayoutWithSize:_entity.frame.size];
+  YGApplyLayoutToHierarchy(_entity, NO, CGPointZero);
 }
 
 - (void)applyLayoutPreservingOrigin:(BOOL)preserveOrigin
 {
-  [self calculateLayoutWithSize:self.view.bounds.size];
-  YGApplyLayoutToViewHierarchy(self.view, preserveOrigin);
+  [self calculateLayoutWithSize:_entity.frame.size];
+  YGApplyLayoutToHierarchy(_entity, preserveOrigin, CGPointZero);
 }
 
 - (void)applyLayoutPreservingOrigin:(BOOL)preserveOrigin dimensionFlexibility:(YGDimensionFlexibility)dimensionFlexibility
 {
-  CGSize size = self.view.bounds.size;
+  CGSize size = _entity.frame.size;
   if (dimensionFlexibility & YGDimensionFlexibilityFlexibleWidth) {
     size.width = YGUndefined;
   }
@@ -258,9 +257,8 @@ YG_PROPERTY(CGFloat, aspectRatio, AspectRatio)
     size.height = YGUndefined;
   }
   [self calculateLayoutWithSize:size];
-  YGApplyLayoutToViewHierarchy(self.view, preserveOrigin);
+  YGApplyLayoutToHierarchy(_entity, preserveOrigin, CGPointZero);
 }
-
 
 - (CGSize)intrinsicSize
 {
@@ -274,26 +272,25 @@ YG_PROPERTY(CGFloat, aspectRatio, AspectRatio)
 - (CGSize)calculateLayoutWithSize:(CGSize)size
 {
   NSAssert([NSThread isMainThread], @"Yoga calculation must be done on main.");
-  NSAssert(self.isEnabled, @"Yoga is not enabled for this view.");
+  NSAssert(self.isEnabled, @"Yoga is not enabled for %@", self);
 
-  YGAttachNodesFromViewHierachy(self.view);
+  YGAttachNodesFromHierachy(_entity);
 
-  const YGNodeRef node = self.node;
   YGNodeCalculateLayout(
-    node,
+    _node,
     size.width,
     size.height,
-    YGNodeStyleGetDirection(node));
+    YGNodeStyleGetDirection(_node));
 
   return (CGSize) {
-    .width = YGNodeLayoutGetWidth(node),
-    .height = YGNodeLayoutGetHeight(node),
+    .width = YGNodeLayoutGetWidth(_node),
+    .height = YGNodeLayoutGetHeight(_node),
   };
 }
 
 #pragma mark - Private
 
-static YGSize YGMeasureView(
+static YGSize YGMeasureEntity(
   YGNodeRef node,
   float width,
   YGMeasureMode widthMode,
@@ -303,8 +300,8 @@ static YGSize YGMeasureView(
   const CGFloat constrainedWidth = (widthMode == YGMeasureModeUndefined) ? CGFLOAT_MAX : width;
   const CGFloat constrainedHeight = (heightMode == YGMeasureModeUndefined) ? CGFLOAT_MAX: height;
 
-  UIView *view = (__bridge UIView*) YGNodeGetContext(node);
-  const CGSize sizeThatFits = [view sizeThatFits:(CGSize) {
+  id<YGLayoutEntity> entity = (__bridge id<YGLayoutEntity>) YGNodeGetContext(node);
+  const CGSize sizeThatFits = [entity sizeThatFits:(CGSize) {
     .width = constrainedWidth,
     .height = constrainedHeight,
   }];
@@ -332,14 +329,15 @@ static CGFloat YGSanitizeMeasurement(
   return result;
 }
 
-static BOOL YGNodeHasExactSameChildren(const YGNodeRef node, NSArray<UIView *> *subviews)
+static BOOL YGNodeHasExactSameChildren(const YGNodeRef node, NSArray<id<YGLayoutEntity>> *subEntities)
 {
-  if (YGNodeGetChildCount(node) != subviews.count) {
+  if (YGNodeGetChildCount(node) != subEntities.count) {
     return NO;
   }
 
-  for (int i=0; i<subviews.count; i++) {
-    if (YGNodeGetChild(node, i) != subviews[i].yoga.node) {
+  for (int i=0; i<subEntities.count; i++) {
+    YGLayout *subLayout = subEntities[i].yoga;
+    if (subLayout && YGNodeGetChild(node, i) != subLayout->_node) {
       return NO;
     }
   }
@@ -347,34 +345,41 @@ static BOOL YGNodeHasExactSameChildren(const YGNodeRef node, NSArray<UIView *> *
   return YES;
 }
 
-static void YGAttachNodesFromViewHierachy(UIView *const view)
+static void YGAttachNodesFromHierachy(id<YGLayoutEntity> const entity)
 {
-  YGLayout *const yoga = view.yoga;
-  const YGNodeRef node = yoga.node;
+  YGLayout *const yoga = entity.yoga;
+  const YGNodeRef node = yoga ? yoga->_node : NULL;
 
   // Only leaf nodes should have a measure function
   if (yoga.isLeaf) {
     YGRemoveAllChildren(node);
-    YGNodeSetMeasureFunc(node, YGMeasureView);
+    YGNodeSetMeasureFunc(node, YGMeasureEntity);
   } else {
     YGNodeSetMeasureFunc(node, NULL);
 
-    NSMutableArray<UIView *> *subviewsToInclude = [[NSMutableArray alloc] initWithCapacity:view.subviews.count];
-    for (UIView *subview in view.subviews) {
-      if (subview.yoga.isIncludedInLayout) {
-        [subviewsToInclude addObject:subview];
+    NSMutableArray<id<YGLayoutEntity>> *subEntitiesToInclude = [[NSMutableArray alloc] initWithCapacity:entity.subEntities.count];
+    for (id<YGLayoutEntity> subEntity in entity.subEntities) {
+      if (subEntity.yoga.isIncludedInLayout) {
+        [subEntitiesToInclude addObject:subEntity];
       }
     }
 
-    if (!YGNodeHasExactSameChildren(node, subviewsToInclude)) {
+    if (!YGNodeHasExactSameChildren(node, subEntitiesToInclude)) {
       YGRemoveAllChildren(node);
-      for (int i=0; i<subviewsToInclude.count; i++) {
-        YGNodeInsertChild(node, subviewsToInclude[i].yoga.node, i);
+      for (int i=0; i<subEntitiesToInclude.count; i++) {
+        YGLayout *subLayout = subEntitiesToInclude[i].yoga;
+        if (subLayout) {
+            if (YGNodeGetParent(subLayout->_node)) {
+              YGNodeRemoveChild(YGNodeGetParent(subLayout->_node),
+                                subLayout->_node);
+            }
+            YGNodeInsertChild(node, subLayout->_node, i);
+        }
       }
     }
 
-    for (UIView *const subview in subviewsToInclude) {
-      YGAttachNodesFromViewHierachy(subview);
+    for (id<YGLayoutEntity> const subEntity in subEntitiesToInclude) {
+      YGAttachNodesFromHierachy(subEntity);
     }
   }
 }
@@ -401,44 +406,86 @@ static CGFloat YGRoundPixelValue(CGFloat value)
   return roundf(value * scale) / scale;
 }
 
-static void YGApplyLayoutToViewHierarchy(UIView *view, BOOL preserveOrigin)
+static void YGApplyLayoutToHierarchy(id<YGLayoutEntity> entity, BOOL preserveOrigin, CGPoint offset)
 {
   NSCAssert([NSThread isMainThread], @"Framesetting should only be done on the main thread.");
 
-  const YGLayout *yoga = view.yoga;
+  const YGLayout *yoga = entity.yoga;
 
-  if (!yoga.isIncludedInLayout) {
+  if (!yoga || !yoga.isIncludedInLayout) {
      return;
   }
 
-  YGNodeRef node = yoga.node;
   const CGPoint topLeft = {
-    YGNodeLayoutGetLeft(node),
-    YGNodeLayoutGetTop(node),
+    YGNodeLayoutGetLeft(yoga->_node) + offset.x,
+    YGNodeLayoutGetTop(yoga->_node) + offset.y,
   };
 
-  const CGPoint bottomRight = {
-    topLeft.x + YGNodeLayoutGetWidth(node),
-    topLeft.y + YGNodeLayoutGetHeight(node),
-  };
-
-  const CGPoint origin = preserveOrigin ? view.frame.origin : CGPointZero;
-  view.frame = (CGRect) {
+  const CGPoint origin = preserveOrigin ? entity.frame.origin : CGPointZero;
+  entity.frame = (CGRect) {
     .origin = {
       .x = YGRoundPixelValue(topLeft.x + origin.x),
       .y = YGRoundPixelValue(topLeft.y + origin.y),
     },
     .size = {
-      .width = YGRoundPixelValue(bottomRight.x) - YGRoundPixelValue(topLeft.x),
-      .height = YGRoundPixelValue(bottomRight.y) - YGRoundPixelValue(topLeft.y),
+      .width = YGNodeLayoutGetWidth(yoga->_node),
+      .height = YGNodeLayoutGetHeight(yoga->_node),
     },
   };
 
   if (!yoga.isLeaf) {
-    for (NSUInteger i=0; i<view.subviews.count; i++) {
-      YGApplyLayoutToViewHierarchy(view.subviews[i], NO);
+    for (NSUInteger i=0; i<entity.subEntities.count; i++) {
+      YGApplyLayoutToHierarchy(entity.subEntities[i],
+                               NO,
+                               [entity conformsToProtocol:@protocol(UICoordinateSpace)] ? CGPointZero : entity.frame.origin);
     }
   }
 }
 
+@end
+
+@implementation YGLayoutContainer
+@synthesize frame=_frame;
+
+- (instancetype)init
+{
+  return [self initWithEntity:self];
+}
+- (instancetype)initWithEntity:(id<YGLayoutEntity>)entity
+{
+  if ((self = [super initWithEntity:entity])) {
+    self.isEnabled = YES;
+  }
+  return self;
+}
+
+- (YGLayout *)yoga
+{
+  return self;
+}
+
+- (CGSize)sizeThatFits:(CGSize)fitSize
+{
+  return CGSizeZero;
+}
+
+- (BOOL)isEnabled
+{
+  if (!super.isEnabled) {
+    return NO;
+  } else {
+    for (id<YGLayoutEntity> subEntity in _entity.subEntities) {
+      YGLayout *const yoga = subEntity.yoga;
+      if (yoga.isEnabled && yoga.isIncludedInLayout) {
+        return YES;
+      }
+    }
+    return NO;
+  }
+}
+
+- (BOOL)isLeaf
+{
+    return NO;
+}
 @end

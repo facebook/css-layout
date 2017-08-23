@@ -26,7 +26,23 @@ typedef NS_OPTIONS(NSInteger, YGDimensionFlexibility) {
   YGDimensionFlexibilityFlexibleHeigth = 1 << 1,
 };
 
+@class YGLayout;
+
+@protocol YGLayoutEntity <NSObject>
+@property (nonatomic, readonly, strong) YGLayout *yoga;
+@property (nonatomic, readonly, copy) NSArray<id<YGLayoutEntity>> *subEntities;
+
+@property (nonatomic) CGRect frame;
+
+- (CGSize)sizeThatFits:(CGSize)fitSize;
+@end
+
 @interface YGLayout : NSObject
+
+/**
+  Returns a new layout managing the entity passed (weakly referenced)
+ */
+- (instancetype)initWithEntity:(id<YGLayoutEntity>)entity NS_DESIGNATED_INITIALIZER;
 
 /**
   The property that decides if we should include this view when calculating layout. Defaults to YES.
@@ -153,4 +169,8 @@ typedef NS_OPTIONS(NSInteger, YGDimensionFlexibility) {
  */
 - (void)markDirty;
 
+@end
+
+@interface YGLayoutContainer : YGLayout <YGLayoutEntity>
+@property (nonatomic, readwrite, copy) NSArray<id<YGLayoutEntity>> *subEntities;
 @end
