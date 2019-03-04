@@ -14,10 +14,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "13687D421DF8748300E7C260"
-               BuildableName = "YogaKitSample.app"
-               BlueprintName = "YogaKitSample"
-               ReferencedContainer = "container:YogaKitSample.xcodeproj">
+               BlueprintIdentifier = "9D4FF1341E35AB150029DFF7"
+               BuildableName = "YogaKit.framework"
+               BlueprintName = "YogaKit"
+               ReferencedContainer = "container:YogaKit.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -26,26 +26,17 @@
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      language = ""
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "638A944E1E215CC800A726AD"
-               BuildableName = "YogaKitSampleTests.xctest"
-               BlueprintName = "YogaKitSampleTests"
-               ReferencedContainer = "container:YogaKitSample.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "13687D421DF8748300E7C260"
-            BuildableName = "YogaKitSample.app"
-            BlueprintName = "YogaKitSample"
-            ReferencedContainer = "container:YogaKitSample.xcodeproj">
+            BlueprintIdentifier = "9D4FF1341E35AB150029DFF7"
+            BuildableName = "YogaKit.framework"
+            BlueprintName = "YogaKit"
+            ReferencedContainer = "container:YogaKit.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <AdditionalOptions>
@@ -55,22 +46,22 @@
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      language = ""
       launchStyle = "0"
       useCustomWorkingDirectory = "NO"
       ignoresPersistentStateOnLaunch = "NO"
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES">
-      <BuildableProductRunnable
-         runnableDebuggingMode = "0">
+      <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "13687D421DF8748300E7C260"
-            BuildableName = "YogaKitSample.app"
-            BlueprintName = "YogaKitSample"
-            ReferencedContainer = "container:YogaKitSample.xcodeproj">
+            BlueprintIdentifier = "9D4FF1341E35AB150029DFF7"
+            BuildableName = "YogaKit.framework"
+            BlueprintName = "YogaKit"
+            ReferencedContainer = "container:YogaKit.xcodeproj">
          </BuildableReference>
-      </BuildableProductRunnable>
+      </MacroExpansion>
       <AdditionalOptions>
       </AdditionalOptions>
    </LaunchAction>
@@ -80,16 +71,15 @@
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
       debugDocumentVersioning = "YES">
-      <BuildableProductRunnable
-         runnableDebuggingMode = "0">
+      <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "13687D421DF8748300E7C260"
-            BuildableName = "YogaKitSample.app"
-            BlueprintName = "YogaKitSample"
-            ReferencedContainer = "container:YogaKitSample.xcodeproj">
+            BlueprintIdentifier = "9D4FF1341E35AB150029DFF7"
+            BuildableName = "YogaKit.framework"
+            BlueprintName = "YogaKit"
+            ReferencedContainer = "container:YogaKit.xcodeproj">
          </BuildableReference>
-      </BuildableProductRunnable>
+      </MacroExpansion>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">
