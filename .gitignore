@@ -1,11 +1,15 @@
 .DS_STORE
 
+*.xcodeproj
+
 /buck-cache/
 /buck-out/
 /.buckconfig.local
 /.buckd
 /gentest/test.html
 .buckversion
+
+.build/
 
 # Jekyll
 /.sass-cache/
