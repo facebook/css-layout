@@ -149,19 +149,44 @@
       lowercased_name, capitalized_name, capitalized_name, YGEdgeAll)
 
 YGValue YGPointValue(CGFloat value) {
-  return (YGValue){.value = value, .unit = YGUnitPoint};
+  return (YGValue){.value = (YGFloat)value, .unit = YGUnitPoint};
 }
 
 YGValue YGPercentValue(CGFloat value) {
-  return (YGValue){.value = value, .unit = YGUnitPercent};
+  return (YGValue){.value = (YGFloat)value, .unit = YGUnitPercent};
 }
 
-static YGConfigRef globalConfig;
+static CGFloat YGScaleFactor() {
+  static CGFloat scale;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^() {
+#if TARGET_OS_OSX
+    scale = [NSScreen mainScreen].backingScaleFactor;
+#else
+    scale = [UIScreen mainScreen].scale;
+#endif
+  });
+
+  return scale;
+}
+
+static YGConfigRef YGGlobalConfig() {
+  static YGConfigRef globalConfig;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^() {
+    globalConfig = YGConfigNew();
+    YGConfigSetExperimentalFeatureEnabled(globalConfig, YGExperimentalFeatureWebFlexBasis, true);
+    YGConfigSetPointScaleFactor(globalConfig, YGScaleFactor());
+  });
+
+  return globalConfig;
+}
 
 @interface YGLayout ()
 
 @property(nonatomic, weak, readonly) UIView* view;
 @property(nonatomic, assign, readonly) BOOL isUIView;
+@property(nonatomic, assign) BOOL isApplingLayout;
 
 @end
 
@@ -171,17 +196,10 @@ static YGConfigRef globalConfig;
 @synthesize isIncludedInLayout = _isIncludedInLayout;
 @synthesize node = _node;
 
-+ (void)initialize {
-  globalConfig = YGConfigNew();
-  YGConfigSetExperimentalFeatureEnabled(
-      globalConfig, YGExperimentalFeatureWebFlexBasis, true);
-  YGConfigSetPointScaleFactor(globalConfig, [UIScreen mainScreen].scale);
-}
-
 - (instancetype)initWithView:(UIView*)view {
   if (self = [super init]) {
     _view = view;
-    _node = YGNodeNewWithConfig(globalConfig);
+    _node = YGNodeNewWithConfig(YGGlobalConfig());
     YGNodeSetContext(_node, (__bridge void*)view);
     _isEnabled = NO;
     _isIncludedInLayout = YES;
@@ -225,9 +243,11 @@ static YGConfigRef globalConfig;
       @"This method must be called on the main thread.");
   if (self.isEnabled) {
     for (UIView* subview in self.view.subviews) {
-      YGLayout* const yoga = subview.yoga;
-      if (yoga.isEnabled && yoga.isIncludedInLayout) {
-        return NO;
+      if (subview.isYogaEnabled) {
+        YGLayout* const yoga = subview.yoga;
+        if (yoga.isEnabled && yoga.isIncludedInLayout) {
+          return NO;
+        }
       }
     }
   }
@@ -292,11 +312,19 @@ YG_PROPERTY(CGFloat, aspectRatio, AspectRatio)
 }
 
 - (void)applyLayout {
+  if (self.isApplingLayout) {
+    return;
+  }
+
   [self calculateLayoutWithSize:self.view.bounds.size];
   YGApplyLayoutToViewHierarchy(self.view, NO);
 }
 
 - (void)applyLayoutPreservingOrigin:(BOOL)preserveOrigin {
+  if (self.isApplingLayout) {
+    return;
+  }
+
   [self calculateLayoutWithSize:self.view.bounds.size];
   YGApplyLayoutToViewHierarchy(self.view, preserveOrigin);
 }
@@ -304,6 +332,10 @@ YG_PROPERTY(CGFloat, aspectRatio, AspectRatio)
 - (void)applyLayoutPreservingOrigin:(BOOL)preserveOrigin
                dimensionFlexibility:
                    (YGDimensionFlexibility)dimensionFlexibility {
+  if (self.isApplingLayout) {
+    return;
+  }
+
   CGSize size = self.view.bounds.size;
   if (dimensionFlexibility & YGDimensionFlexibilityFlexibleWidth) {
     size.width = YGUndefined;
@@ -343,9 +375,9 @@ YG_PROPERTY(CGFloat, aspectRatio, AspectRatio)
 
 static YGSize YGMeasureView(
     YGNodeRef node,
-    float width,
+    YGFloat width,
     YGMeasureMode widthMode,
-    float height,
+    YGFloat height,
     YGMeasureMode heightMode) {
   const CGFloat constrainedWidth =
       (widthMode == YGMeasureModeUndefined) ? CGFLOAT_MAX : width;
@@ -362,16 +394,24 @@ static YGSize YGMeasureView(
   //
   // See https://github.com/facebook/yoga/issues/606 for more information.
   if (!view.yoga.isUIView || [view.subviews count] > 0) {
+#if TARGET_OS_OSX
+    CGSize fittingSize = view.fittingSize;
+    sizeThatFits = (CGSize){
+      .width = MIN(constrainedWidth, fittingSize.width),
+      .height = MIN(constrainedHeight, fittingSize.height)
+    };
+#else
     sizeThatFits = [view sizeThatFits:(CGSize){
                                           .width = constrainedWidth,
                                           .height = constrainedHeight,
                                       }];
+#endif
   }
 
   return (YGSize){
-      .width = YGSanitizeMeasurement(
+      .width = (YGFloat)YGSanitizeMeasurement(
           constrainedWidth, sizeThatFits.width, widthMode),
-      .height = YGSanitizeMeasurement(
+      .height = (YGFloat)YGSanitizeMeasurement(
           constrainedHeight, sizeThatFits.height, heightMode),
   };
 }
@@ -422,7 +462,7 @@ static void YGAttachNodesFromViewHierachy(UIView* const view) {
     NSMutableArray<UIView*>* subviewsToInclude =
         [[NSMutableArray alloc] initWithCapacity:view.subviews.count];
     for (UIView* subview in view.subviews) {
-      if (subview.yoga.isEnabled && subview.yoga.isIncludedInLayout) {
+      if (subview.isYogaEnabled && subview.yoga.isEnabled && subview.yoga.isIncludedInLayout) {
         [subviewsToInclude addObject:subview];
       }
     }
@@ -448,14 +488,9 @@ static void YGRemoveAllChildren(const YGNodeRef node) {
   YGNodeRemoveAllChildren(node);
 }
 
-static CGFloat YGRoundPixelValue(CGFloat value) {
-  static CGFloat scale;
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^() {
-    scale = [UIScreen mainScreen].scale;
-  });
-
-  return roundf(value * scale) / scale;
+static inline CGSize YGAlignPixelSize(CGSize s) {
+    CGFloat scale = YGScaleFactor();
+    return (CGSize) { .width = ceil(s.width * scale) / scale, .height = ceil(s.height * scale) / scale };
 }
 
 static void YGApplyLayoutToViewHierarchy(UIView* view, BOOL preserveOrigin) {
@@ -463,44 +498,78 @@ static void YGApplyLayoutToViewHierarchy(UIView* view, BOOL preserveOrigin) {
       [NSThread isMainThread],
       @"Framesetting should only be done on the main thread.");
 
+  if (!view.isYogaEnabled || !view.yoga.isEnabled) {
+    return;
+  }
+
   const YGLayout* yoga = view.yoga;
+
+  if (yoga.isApplingLayout) {
+    return;
+  }
 
   if (!yoga.isIncludedInLayout) {
     return;
   }
 
+  yoga.isApplingLayout = YES;
+
   YGNodeRef node = yoga.node;
-  const CGPoint topLeft = {
-      YGNodeLayoutGetLeft(node),
-      YGNodeLayoutGetTop(node),
-  };
+    
+  const CGPoint topLeft = (view.superview.isYogaEnabled && view.superview.yoga.isEnabled) ? (CGPoint) {
+      .x = YGNodeLayoutGetLeft(node),
+      .y = YGNodeLayoutGetTop(node)
+  } : CGPointZero;
 
   const CGPoint bottomRight = {
-      topLeft.x + YGNodeLayoutGetWidth(node),
-      topLeft.y + YGNodeLayoutGetHeight(node),
+      .x = (CGFloat)(topLeft.x + YGNodeLayoutGetWidth(node)),
+      .y = (CGFloat)(topLeft.y + YGNodeLayoutGetHeight(node)),
   };
 
+#if TARGET_OS_OSX
   const CGPoint origin = preserveOrigin ? view.frame.origin : CGPointZero;
-  view.frame = (CGRect){
-      .origin =
-          {
-              .x = YGRoundPixelValue(topLeft.x + origin.x),
-              .y = YGRoundPixelValue(topLeft.y + origin.y),
-          },
-      .size =
-          {
-              .width = YGRoundPixelValue(bottomRight.x) -
-                  YGRoundPixelValue(topLeft.x),
-              .height = YGRoundPixelValue(bottomRight.y) -
-                  YGRoundPixelValue(topLeft.y),
-          },
+#else
+  // use bounds/center and not frame if non-identity transform.
+  const CGPoint origin = preserveOrigin ? (CGPoint) {
+                                            .x = (CGFloat)(view.center.x - CGRectGetWidth(view.bounds) * 0.5),
+                                            .y = (CGFloat)(view.center.y - CGRectGetHeight(view.bounds) * 0.5)
+                                          }
+                                        : CGPointZero;
+#endif
+
+  CGRect frame = (CGRect) {
+    .origin = (CGPoint) { .x = topLeft.x + origin.x, .y = topLeft.y + origin.y, },
+    .size = (CGSize) { .width = MAX(bottomRight.x - topLeft.x, 0), .height = MAX(bottomRight.y - topLeft.y, 0), }
   };
+
+#if TARGET_OS_OSX
+  if (!view.superview.isFlipped && view.superview.isYogaEnabled && view.superview.yoga.isEnabled) {
+    frame.origin.y = (CGFloat)(YGNodeLayoutGetHeight(view.superview.yoga.node) - CGRectGetMaxY(frame));
+  }
+
+  view.frame = (CGRect) {
+    .origin = frame.origin,
+    .size = YGAlignPixelSize(frame.size)
+  };
+#else
+  view.bounds = (CGRect) {
+    .origin = view.bounds.origin,
+    .size = YGAlignPixelSize(frame.size)
+  };
+
+  view.center = (CGPoint) {
+    .x = CGRectGetMidX(frame),
+    .y = CGRectGetMidY(frame)
+  };
+#endif
 
   if (!yoga.isLeaf) {
     for (NSUInteger i = 0; i < view.subviews.count; i++) {
       YGApplyLayoutToViewHierarchy(view.subviews[i], NO);
     }
   }
+
+  yoga.isApplingLayout = NO;
 }
 
 @end

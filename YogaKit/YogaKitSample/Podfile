@@ -1,6 +1,21 @@
+
 use_frameworks!
 
 target 'YogaKitSample' do
-  pod 'YogaKit', :path => '../../YogaKit.podspec'
-  pod 'IGListKit', '~> 2.1.0'
+    platform :ios, '9.0'
+    pod 'Yoga', :path => '../../Yoga.podspec'
+    pod 'YogaKit', :path => '../../YogaKit.podspec'
+    pod 'IGListKit', '~> 4.0.0'
+end
+
+target 'YogaKitTVSample' do
+    platform :tvos, '9.0'
+    pod 'Yoga', :path => '../../Yoga.podspec'
+    pod 'YogaKit', :path => '../../YogaKit.podspec'
+end
+
+target 'YogaKitOSXSample' do
+    platform :osx, '10.10'
+    pod 'Yoga', :path => '../../Yoga.podspec'
+    pod 'YogaKit', :path => '../../YogaKit.podspec'
 end

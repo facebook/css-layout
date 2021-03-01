@@ -112,9 +112,9 @@ public:
       case AUTO_BITS:
         return YGValueAuto;
       case ZERO_BITS_POINT:
-        return YGValue{0.0f, YGUnitPoint};
+        return YGValue{0.0, YGUnitPoint};
       case ZERO_BITS_PERCENT:
-        return YGValue{0.0f, YGUnitPercent};
+        return YGValue{0.0, YGUnitPercent};
     }
 
     if (std::isnan(payload_.value)) {
