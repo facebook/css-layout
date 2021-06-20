@@ -371,4 +371,7 @@ void YGTraversePreOrder(
 
 void YGNodeSetChildren(YGNodeRef owner, const std::vector<YGNodeRef>& children);
 
+extern bool operator==(const YGValue& lhs, const YGValue& rhs);
+extern bool operator!=(const YGValue& lhs, const YGValue& rhs);
+
 #endif
