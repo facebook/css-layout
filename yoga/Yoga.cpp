@@ -3770,9 +3770,14 @@ bool YGLayoutNodeInternal(
 
   depth++;
 
+  bool ownerHasUndefinedHeight = YGFloatIsUndefined(ownerHeight);
+  bool ownerHasUndefinedWidth = YGFloatIsUndefined(ownerWidth);
+
   const bool needToVisitNode =
       (node->isDirty() && layout->generationCount != generationCount) ||
-      layout->lastOwnerDirection != ownerDirection;
+      layout->lastOwnerDirection != ownerDirection || 
+      layout->lastOwnerHadUndefinedHeight != ownerHasUndefinedHeight|| 
+      layout->lastOwnerHadUndefinedWidth != ownerHasUndefinedWidth;
 
   if (needToVisitNode) {
     // Invalidate the cached results.
@@ -3954,6 +3959,8 @@ bool YGLayoutNodeInternal(
     }
 
     layout->lastOwnerDirection = ownerDirection;
+    layout->lastOwnerHadUndefinedHeight = ownerHasUndefinedHeight;
+    layout->lastOwnerHadUndefinedWidth = ownerHasUndefinedWidth;
 
     if (cachedResults == nullptr) {
       if (layout->nextCachedMeasurementsIndex + 1 >
