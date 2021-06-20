@@ -1671,7 +1671,9 @@ static void YGNodeWithMeasureFuncSetMeasuredDimensions(
       : YGFloatMax(0, availableHeight - paddingAndBorderAxisColumn);
 
   if (widthMeasureMode == YGMeasureModeExactly &&
-      heightMeasureMode == YGMeasureModeExactly) {
+      heightMeasureMode == YGMeasureModeExactly &&
+      !YGConfigIsExperimentalFeatureEnabled(
+          node->getConfig(), YGExperimentalFeatureCallMeasureCallbackOnAllNodes)) {
     // Don't bother sizing the text if both dimensions are already defined.
     node->setLayoutMeasuredDimension(
         YGNodeBoundAxis(
